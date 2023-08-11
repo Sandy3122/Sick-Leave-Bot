@@ -4,18 +4,16 @@ const {ConfirmPrompt,ChoicePrompt, DateTimePrompt, TextPrompt} = require('botbui
 
 const {CardFactory} = require('botbuilder');
 
-const cancelCard = require('./CancelSickLeaveCard.json');
+const {Adaptive_card} = require('../resources/adaptiveCards/CancelSickLeaveCard');
 
-const CARDS = [cancelCard];
-
+// const CARDS = [cancelCard];
 
 const Confirm_Prompt = "Confirm_Prompt";
 const Choice_Prompt = "Choice_Prompt";
-
 const Text_Prompt = "Text_Prompt";
 const DateTime_Prompt = "DateTime_Prompt";
 const Waterfall_Dialog = "Waterfall_Dialog";
-// let endDialog = '';
+let endDialog = '';
 
 class CancelSickLeaveDialog extends ComponentDialog{
 
@@ -29,12 +27,13 @@ class CancelSickLeaveDialog extends ComponentDialog{
         
         //WaterFall Dialog
         this.addDialog(new WaterfallDialog(Waterfall_Dialog, [
+
             this.firstStep.bind(this),          // Ask confirmatiopn if user want to make reservation
             this.ConfirmStep.bind(this),        // Show summary of values entered by user and ask confirmation to make sick leave
             this.summaryStep.bind(this)         // Final step to process the sick leave application
         ]));
             this.initialDialogId = Waterfall_Dialog;
-            this.endDialog = false; // Change endDialog to a class property
+            // this.endDialog = false; // Change endDialog to a class property
     }
 
     async run(turnContext, accessor) {
@@ -52,20 +51,16 @@ class CancelSickLeaveDialog extends ComponentDialog{
             }
         }
     }
-    
-
 
 async firstStep(step) {
-this.endDialog = false;
+endDialog = false;
 //Running a prompt here means the next WaterFallStep will be run when the users response is received
 //Adaptive Cards has sent as an attachments
 
-await step.context.sendActivity({
-    // text : "Enter Details For Cancelation",
-    attachments: [CardFactory.adaptiveCard(CARDS[0])]
-});
+// const adaptiveCard = CardFactory.adaptiveCard(Adaptive_card());
+// await step.context.sendActivity({ attachments: [adaptiveCard] });
 
-return await step.prompt(Text_Prompt, '');
+return await step.prompt(Text_Prompt, 'Please enter the HRM_ID to cancel the sick leave application');
 // 'Please enter the HRM_ID to cancel the sick leave application'
 }
 
@@ -77,9 +72,9 @@ async ConfirmStep(step){
     // const startDate = new Date(step.values.startDate).toISOString().split('T')[0];
     // const endDate = new Date(step.values.endDate).toISOString().split('T')[0];
 
-    let msg = `Your Sick Leave Application on following HRM_Id : 
+    let msg = `Your Sick Leave Application on following HRM_Id :
     \n HRM Id : ${step.values.HRMId} `
-
+    
     await step.context.sendActivity(msg);
     return await step.prompt(Confirm_Prompt, 'Are you want to CANCEL your sick leave application ?', ['Yes', 'No']);
 
@@ -89,17 +84,17 @@ async ConfirmStep(step){
 async summaryStep(step) {
     if (step.result === true) {
         // Business Logic
-        await step.context.sendActivity('You Successfully cancelled your Sick Leave Application');
-        endDialog = true; // Set the endDialog flag to true when the dialog is complete
+        const adaptiveCard = CardFactory.adaptiveCard(Adaptive_card());
+        await step.context.sendActivity({ attachments: [adaptiveCard] });
+        await step.context.sendActivity(`You Successfully cancelled your Sick Leave Application with HRMId : ${step.values.HRMId}`);
+        endDialog = true;               // Set the endDialog flag to true when the dialog is complete
         return await step.endDialog();
     }
 }
 
 isDialogComplete() {
-    return this.endDialog; // Return the class property
+    return endDialog; // Return the class property
 }
 }
 
 module.exports.CancelSickLeaveDialog = CancelSickLeaveDialog;
-
-

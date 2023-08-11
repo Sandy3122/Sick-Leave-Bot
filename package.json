@@ -18,6 +18,7 @@
     "dependencies": {
         "adaptivecards": "^3.0.1",
         "botbuilder": "~4.15.0",
+        "botbuilder-ai": "^4.20.0",
         "botbuilder-dialogs": "^4.20.0",
         "dotenv": "~8.2.0",
         "node": "^18.12.1",

@@ -1,10 +1,11 @@
-const {WaterfallDialog, ComponentDialog, DialogSet, DialogTurnStatus} = require('botbuilder-dialogs');
+const {WaterfallDialog, ComponentDialog, DialogSet, DialogTurnStatus, Dialog} = require('botbuilder-dialogs');
 
 const {ConfirmPrompt, ChoicePrompt, DateTimePrompt, TextPrompt} = require('botbuilder-dialogs');
 
 const {CardFactory} = require('botbuilder');
 
 const {SickLeaveSuccessCard} = require('../resources/adaptiveCards/SuccesSickLeaveCard');
+const {getAllDetailsCard} = require('../resources/adaptiveCards/getAllDetails');
 
 // const {getCurrentDateTime} = require('../Utilities/dateTime')
 
@@ -27,12 +28,9 @@ class MakeSickLeaveDialog extends ComponentDialog{
         
         //WaterFall Dialog
         this.addDialog(new WaterfallDialog(Waterfall_Dialog, [
-            this.firstStep.bind(this),          // Ask confirmatiopn if user want to make reservation
+            this.firstStep.bind(this),          // Ask confirmation if user want to make reservation
             this.getName.bind(this),            // Get name from the user
-            this.getId.bind(this),            // Get HRM_ID from the user
-            this.getStartDate.bind(this),       // Get Start Date from the user
-            this.getEndDate.bind(this),         // Get End Date from the user
-            this.getReason.bind(this),          // Get Reason from the user
+            this.getAllDetailsStep.bind(this),  // Get All The Details
             this.ConfirmStep.bind(this),        // Show summary of values entered by user and ask confirmation to make sick leave
             this.summaryStep.bind(this)         // Final step to process the sick leave application
         ]));
@@ -44,20 +42,26 @@ class MakeSickLeaveDialog extends ComponentDialog{
     and provide get, set, and delete methods for accessing your state properties from within a turn.
     **/
     async run(turnContext, accessor) {
+        try{
         const dialogSet = new DialogSet(accessor);
         dialogSet.add(this);
         const dialogContext = await dialogSet.createContext(turnContext);
-    
         // Check if the 'results' object is defined before accessing its properties
         if (dialogContext.activeDialog && !dialogContext.activeDialog.state) {
             await dialogContext.beginDialog(this.id);
-        } else {
+        } 
+        else {
             const results = await dialogContext.continueDialog();
-            if (results.status === DialogTurnStatus.empty) {
+            if (!results || results.status === DialogTurnStatus.empty) {
                 await dialogContext.beginDialog(this.id);
             }
         }
     }
+    catch(err){
+        console.error(err);
+    }
+    }
+
 
 async firstStep(step) {
     
@@ -79,64 +83,54 @@ async getName(step) {
         endDialog = true;
         return await step.endDialog();
     }
-
 }
 
-async getId(step) {
-
+async getAllDetailsStep(step){
     step.values.name = step.result;
-    return await step.prompt(Text_Prompt, `${step.values.name}, Please Enter Your HRM_Id, Ex:HRM1234`);
-}
+    try{
+    let adaptiveCard = CardFactory.adaptiveCard(getAllDetailsCard());
+    await step.context.sendActivity({ attachments: [adaptiveCard] });
+    // return await step.prompt();
+    return Dialog.EndOfTurn;
+    }
+    catch(err){
+        console.error(err);
+    }
 
-
-
-async getStartDate(step) {
-    step.values.id = step.result;
-    return await step.prompt(DateTime_Prompt, { prompt: `${step.values.name}, Please Enter The Start Date For Your Sick Leave.`});
-}
-
-async getEndDate(step) {
-    step.values.startDate = step.result;
-    return await step.prompt(DateTime_Prompt, { prompt: `${step.values.name}, Please Enter The End Date For Your Sick Leave.`});
-}
-
-
-async getReason(step) {
-    step.values.endDate = step.result;
-    // Assuming you have added the 'TextPrompt' with the ID 'Text_Prompt' to the dialog earlier
-    return await step.prompt(Text_Prompt, `${step.values.name}, Please Enter The Reason For Your Sick Leave.`);
 }
 
 async ConfirmStep(step){
-    step.values.reason = step.result;
-
-    // Extracting only the date part from startDate and endDate
-    // const startDate = new Date(step.values.startDate).toISOString().split('T')[0];
-    // const endDate = new Date(step.values.endDate).toISOString().split('T')[0];
+    step.values.details = step.context.activity.value;
+    console.log(step.values.details)
 
     let msg = `You have entered following values : 
     \n Name : ${step.values.name}
-    \n HRM_Id : ${step.values.id}
-    \n Sick Leave Start Date : ${JSON.stringify(step.values.startDate)}
-    \n Sick Leave End Date : ${JSON.stringify(step.values.endDate)}
-    \n Reason : ${step.values.reason}`
+    \n HRM_Id : ${step.values.details.HrmId}
+    \n Sick Leave Start Date : ${JSON.stringify(step.values.details.StartDate)}
+    \n Sick Leave End Date : ${JSON.stringify(step.values.details.EndDate)}
+    \n Reason : ${step.values.details.Reason}`
     await step.context.sendActivity(msg);
     return await step.prompt(Confirm_Prompt, `${step.values.name}, Are you sure that all the values are correct and you want to proceed for Sick Leave ?`, ['Yes', 'No']);
+
 }
 
 async summaryStep(step) {
+    try{
     if (step.result === true) {
         // Business Logic
         const adaptiveCard = CardFactory.adaptiveCard(SickLeaveSuccessCard());
         await step.context.sendActivity({ attachments: [adaptiveCard] });
-        await step.context.sendActivity(`${step.values.name}, Thank you for applying for sick leave. Your application has been received with Id: ${step.values.id}.`);
+        await step.context.sendActivity(`${step.values.name}, Thank you for applying for sick leave. Your application has been received with Id: ${step.values.details.HrmId}.`);
         endDialog = true; // Set the endDialog flag to true when the dialog is complete
         return await step.endDialog; // Use step.endDialog() instead of step.endDialog
-    }else
-    {
+    }
+    else{
         await step.context.sendActivity(`${step.values.name}, You Choose Not To Go Ahead With The Application`);
         endDialog = true;
         return await step.endDialog();
+    }}
+    catch(err){
+        console.error(err);
     }
 }
 
